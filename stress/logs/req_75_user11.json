@@ -1,0 +1,55 @@
+{
+  "started_at": 1756126714.9311614,
+  "duration_sec": 6.225,
+  "http_status": 200,
+  "response": {
+    "success": true,
+    "message": "Passport validation successful",
+    "data": {
+      "is_valid": true,
+      "validation_steps": {
+        "quality": {
+          "is_acceptable": true,
+          "is_valid": true,
+          "message": "Image quality OK",
+          "resolution": [
+            625,
+            438
+          ],
+          "sharpness": 2976.1770163863607
+        },
+        "layout": {
+          "is_valid_layout": true,
+          "message": "Layout OK (face on left, proper position & size)"
+        },
+        "mrz_extraction": {
+          "success": true,
+          "ocr_available": true,
+          "mrz_detected": true
+        }
+      },
+      "errors": [],
+      "mrz_data": {
+        "document_type": "P",
+        "country_code": "TUN",
+        "surname": "ZIADI",
+        "given_names": "TAHARK",
+        "passport_number": "Y847807",
+        "nationality": "TUN",
+        "date_of_birth": "620107",
+        "gender": "M",
+        "expiration_date": "230906",
+        "personal_number": "018178000204",
+        "raw_mrz_line1": "P<TUNZIADI<<TAHARK<<<<<<<<<<<<<KKKKKKKKKKKKK",
+        "raw_mrz_line2": "Y847807<<8TUN6201072M230906201817800<0204<16",
+        "check_digit_valid": false
+      }
+    }
+  },
+  "error": null,
+  "interaction_id": 75,
+  "user_id": 11,
+  "scheduled_offset": 25.50138031283546,
+  "timestamp_iso": "2025-08-25T12:58:41.156223Z",
+  "img": "passport_image00.jpg"
+}

@@ -1,0 +1,63 @@
+# --- Core framework ---
+fastapi==0.116.1
+uvicorn==0.35.0
+starlette==0.47.2
+python-dotenv==1.1.1
+python-multipart==0.0.20
+uvloop==0.21.0
+
+# --- Passport/MRZ processing ---
+PassportEye==2.2.2
+pytesseract==0.3.13
+opencv-python==4.12.0.88
+pillow==11.3.0
+pdfminer==20191125
+
+# --- Validation / data handling ---
+pydantic==2.11.7
+pydantic_core==2.33.2
+typing-extensions==4.14.1
+typing-inspection==0.4.1
+
+# --- Scientific / ML / Image quality checks ---
+numpy==2.2.6
+scipy==1.16.0
+scikit-learn==1.7.1
+scikit-image==0.25.2
+joblib==1.5.1
+threadpoolctl==3.6.0
+imageio==2.37.0
+tifffile==2025.6.11
+networkx==3.5
+contourpy==1.3.2
+matplotlib==3.10.3
+kiwisolver==1.4.8
+fonttools==4.59.0
+pyparsing==3.2.3
+cycler==0.12.1
+lazy_loader==0.4
+
+# --- Logging & monitoring ---
+coloredlogs==15.0.1
+humanfriendly==10.0
+psutil==7.0.0
+
+# --- Utilities ---
+requests==2.32.3
+PyYAML==6.0.2
+cryptography==43.0.3
+pycryptodome==3.23.0
+python-dateutil==2.9.0.post0
+six==1.17.0
+sniffio==1.3.1
+anyio==4.9.0
+h11==0.16.0
+httpx==0.28.1
+httpcore==1.0.9
+websockets==15.0.1
+watchfiles==1.1.0
+
+# --- Misc (runtime) ---
+certifi==2025.8.3
+packaging==25.0
+platformdirs==4.3.8

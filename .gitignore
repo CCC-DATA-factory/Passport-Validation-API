@@ -1,0 +1,23 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+pip-wheel-metadata/
+
+# IDE/editor
+.vscode/
+.idea/
+.DS_Store
+
+# Logs & test outputs (do NOT push per-request logs)
+tests/logs/
+*.log
+
+# Docker
+*.tar
+docker-compose.override.yml
+
+# OS
+Thumbs.db

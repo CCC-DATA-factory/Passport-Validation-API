@@ -1,0 +1,12 @@
+{
+  "started_at": 1756127755.042016,
+  "duration_sec": 0.0,
+  "http_status": null,
+  "response": null,
+  "error": "RuntimeError: Cannot send a request, as the client has been closed.",
+  "interaction_id": 57,
+  "user_id": 34,
+  "scheduled_offset": 40.47677137977711,
+  "timestamp_iso": "2025-08-25T13:15:55.042016Z",
+  "img": "invalid_mrz.jpg"
+}

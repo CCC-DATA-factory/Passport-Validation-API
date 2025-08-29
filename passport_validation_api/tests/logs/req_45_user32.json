@@ -1,0 +1,12 @@
+{
+  "started_at": 1756127754.5914862,
+  "duration_sec": 0.407,
+  "http_status": null,
+  "response": null,
+  "error": "ReadError: ",
+  "interaction_id": 45,
+  "user_id": 32,
+  "scheduled_offset": 31.719746879253503,
+  "timestamp_iso": "2025-08-25T13:15:54.998318Z",
+  "img": "invalid_mrz.jpg"
+}
