@@ -28,8 +28,8 @@ import statistics
 # CONFIG (tweak these)
 # -------------------------
 API_URL = "http://localhost:8000/api/v1/validate?include_debug=false"   # change to your endpoint
-IMAGES_DIR = Path("tests/passports")                        # put many passport images here
-LOG_DIR = Path("tests/logs")
+IMAGES_DIR = Path("passports")                        # put many passport images here
+LOG_DIR = Path("logs")
 CSV_SUMMARY = LOG_DIR / "summary.csv"
 
 # defaults (override via CLI)

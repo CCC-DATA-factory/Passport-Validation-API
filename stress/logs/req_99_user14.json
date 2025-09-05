@@ -1,55 +1,12 @@
 {
-  "started_at": 1756126735.5624058,
-  "duration_sec": 8.96,
-  "http_status": 200,
-  "response": {
-    "success": true,
-    "message": "Passport validation successful",
-    "data": {
-      "is_valid": true,
-      "validation_steps": {
-        "quality": {
-          "is_acceptable": true,
-          "is_valid": true,
-          "message": "Image quality OK",
-          "resolution": [
-            722,
-            468
-          ],
-          "sharpness": 1239.3668514537633
-        },
-        "layout": {
-          "is_valid_layout": true,
-          "message": "Layout OK (face on left, proper position & size)"
-        },
-        "mrz_extraction": {
-          "success": true,
-          "ocr_available": true,
-          "mrz_detected": true
-        }
-      },
-      "errors": [],
-      "mrz_data": {
-        "document_type": "P",
-        "country_code": "TUN",
-        "surname": "ZIEDI",
-        "given_names": "WISSAL",
-        "passport_number": "Y847835",
-        "nationality": "TUN",
-        "date_of_birth": "990321",
-        "gender": "F",
-        "expiration_date": "230907",
-        "personal_number": "098922390204",
-        "raw_mrz_line1": "P<TUNZIEDI<<WISSAL<<<<<<K<<<<K<<K<KKKKKKKKKK",
-        "raw_mrz_line2": "Y847835<<7TUN9903218F230907309892239<0204<86",
-        "check_digit_valid": false
-      }
-    }
-  },
-  "error": null,
+  "started_at": 1756913568.4499433,
+  "duration_sec": 1.108,
+  "http_status": 422,
+  "response": null,
+  "error": "HTTP 422: {\"success\":false,\"message\":\"Passport validation failed\",\"errors\":[\"MRZ data parsing failed\"],\"data\":null}",
   "interaction_id": 99,
   "user_id": 14,
-  "scheduled_offset": 29.52356524558288,
-  "timestamp_iso": "2025-08-25T12:59:04.522786Z",
-  "img": "passport_image002.jpg"
+  "scheduled_offset": 846.4380388461079,
+  "timestamp_iso": "2025-09-03T15:32:49.557649Z",
+  "img": "invalid_mrz.jpg"
 }

@@ -1,0 +1,12 @@
+{
+  "started_at": 1756913961.4349842,
+  "duration_sec": 0.074,
+  "http_status": 422,
+  "response": null,
+  "error": "HTTP 422: {\"success\":false,\"message\":\"Passport validation failed\",\"errors\":[\"Image quality insufficient for processing\"],\"data\":null}",
+  "interaction_id": 147,
+  "user_id": 149,
+  "scheduled_offset": 1239.4076216281921,
+  "timestamp_iso": "2025-09-03T15:39:21.509335Z",
+  "img": "passport_image003.jpg"
+}

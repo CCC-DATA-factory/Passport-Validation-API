@@ -1,0 +1,55 @@
+{
+  "started_at": 1756914471.5983746,
+  "duration_sec": 1.15,
+  "http_status": 200,
+  "response": {
+    "success": true,
+    "message": "Passport validation successful",
+    "data": {
+      "is_valid": true,
+      "validation_steps": {
+        "quality": {
+          "is_acceptable": true,
+          "is_valid": true,
+          "message": "Image quality OK",
+          "resolution": [
+            722,
+            468
+          ],
+          "sharpness": 1239.3668514537633
+        },
+        "layout": {
+          "is_valid_layout": true,
+          "message": "Layout OK (face on left, proper position & size)"
+        },
+        "mrz_extraction": {
+          "success": true,
+          "ocr_available": true,
+          "mrz_detected": true
+        }
+      },
+      "errors": [],
+      "mrz_data": {
+        "document_type": "P",
+        "country_code": "TUN",
+        "surname": "ZIEDI",
+        "given_names": "WISSAL",
+        "passport_number": "Y847835",
+        "nationality": "TUN",
+        "date_of_birth": "990321",
+        "gender": "F",
+        "expiration_date": "230907",
+        "personal_number": "098922390204",
+        "raw_mrz_line1": "P<TUNZIEDI<<WISSAL<<<<<<K<<<KKK<<KKKKKKKKKKK",
+        "raw_mrz_line2": "Y847835<<7TUN9903218F230907309892239<0204<86",
+        "check_digit_valid": false
+      }
+    }
+  },
+  "error": null,
+  "interaction_id": 240,
+  "user_id": 382,
+  "scheduled_offset": 1749.5800490401477,
+  "timestamp_iso": "2025-09-03T15:47:52.748784Z",
+  "img": "passport_image002.jpg"
+}

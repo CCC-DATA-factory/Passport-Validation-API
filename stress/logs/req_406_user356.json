@@ -1,0 +1,55 @@
+{
+  "started_at": 1756915606.9659534,
+  "duration_sec": 1.113,
+  "http_status": 200,
+  "response": {
+    "success": true,
+    "message": "Passport validation successful",
+    "data": {
+      "is_valid": true,
+      "validation_steps": {
+        "quality": {
+          "is_acceptable": true,
+          "is_valid": true,
+          "message": "Image quality OK",
+          "resolution": [
+            662,
+            350
+          ],
+          "sharpness": 2781.3397189358116
+        },
+        "layout": {
+          "is_valid_layout": true,
+          "message": "Layout OK (face on left, proper position & size)"
+        },
+        "mrz_extraction": {
+          "success": true,
+          "ocr_available": true,
+          "mrz_detected": true
+        }
+      },
+      "errors": [],
+      "mrz_data": {
+        "document_type": "P",
+        "country_code": "TUN",
+        "surname": "KADACHI",
+        "given_names": "HAYET",
+        "passport_number": "C748955",
+        "nationality": "TUN",
+        "date_of_birth": "611216",
+        "gender": "F",
+        "expiration_date": "241126",
+        "personal_number": "007977190204",
+        "raw_mrz_line1": "P<TUNKADACHI<<HAYET<<<<<<<<<<K<KKKKKKKKKKKK<",
+        "raw_mrz_line2": "C748955<<2TUN6112169F241126600797719<0204<62",
+        "check_digit_valid": false
+      }
+    }
+  },
+  "error": null,
+  "interaction_id": 406,
+  "user_id": 356,
+  "scheduled_offset": 2884.950208009667,
+  "timestamp_iso": "2025-09-03T16:06:48.078994Z",
+  "img": "passport_image0006.jpg"
+}

@@ -1,0 +1,12 @@
+{
+  "started_at": 1756913818.3633006,
+  "duration_sec": 1.222,
+  "http_status": 422,
+  "response": null,
+  "error": "HTTP 422: {\"success\":false,\"message\":\"Passport validation failed\",\"errors\":[\"MRZ data parsing failed\"],\"data\":null}",
+  "interaction_id": 128,
+  "user_id": 398,
+  "scheduled_offset": 1096.3510953805749,
+  "timestamp_iso": "2025-09-03T15:36:59.584831Z",
+  "img": "invalid_mrz.jpg"
+}
