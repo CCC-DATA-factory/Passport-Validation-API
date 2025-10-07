@@ -52,21 +52,11 @@ class MRZDataV2(BaseModel):
     
     @validator('date_of_birth', 'expiration_date')
     def validate_dates(cls, v):
-        if len(v) != 6 or not v.isdigit():
-            raise ValueError('Dates must be in YYMMDD format')
-        
-        # Basic date validation
-        year = int(v[0:2])
-        month = int(v[2:4])
-        day = int(v[4:6])
-        
-        if month < 1 or month > 12:
-            raise ValueError('Invalid month in date')
-        if day < 1 or day > 31:
-            raise ValueError('Invalid day in date')
-            
-        return v
-    
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+            return v
+        except ValueError:
+            raise ValueError("Dates must be in YYYY-MM-DD format")
     @validator('gender')
     def validate_gender(cls, v):
         if v not in ['M', 'F', 'X']:
