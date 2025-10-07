@@ -226,11 +226,11 @@ class MRZExtractor:
         debug: bool = False,
         use_ocr: bool = False
     ) -> Optional[np.ndarray]:
-        """Core MRZ detection and cropping logic."""
+        """Core MRZ detection and cropping logic (fixed-percentage crop, no contours)."""
         orig = image.copy()
         orig_h, orig_w = orig.shape[:2]
-        
-        # Resize for processing
+
+        # Resize for processing (same as before)
         scale = 1.0
         if self.resize_width and orig_w != self.resize_width:
             scale = self.resize_width / float(orig_w)
@@ -238,18 +238,29 @@ class MRZExtractor:
         else:
             proc = orig.copy()
 
+        # Desaturate + sharpen (same as before)
+        hsv = cv2.cvtColor(proc, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+        s[:] = 0
+        hsv_desat = cv2.merge([h, s, v])
+        proc = cv2.cvtColor(hsv_desat, cv2.COLOR_HSV2BGR)
+
+        kernel_sharpening = np.array([[-1, -1, -1],
+                                    [-1,  9, -1],
+                                    [-1, -1, -1]])
+        proc = cv2.filter2D(proc, -1, kernel_sharpening)
+
+        # keep proc dims
         h, w = proc.shape[:2]
 
-        # Image processing pipeline
+        # Image processing pipeline (same as before) - produce 'closed' for debug
         gray = cv2.cvtColor(proc, cv2.COLOR_BGR2GRAY)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         gray = clahe.apply(gray)
 
-        # Blackhat morphology
         rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 7))
         blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, rect_kernel)
 
-        # Gradient detection
         gradX = cv2.Sobel(blackhat, ddepth=cv2.CV_32F, dx=1, dy=0, ksize=-1)
         gradX = np.absolute(gradX)
         (minVal, maxVal) = (np.min(gradX), np.max(gradX))
@@ -261,140 +272,92 @@ class MRZExtractor:
         gradX = cv2.GaussianBlur(gradX, (3, 3), 0)
         _, thresh = cv2.threshold(gradX, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # Morphological operations
         sq_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 5))
         closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, sq_kernel)
         closed = cv2.morphologyEx(closed, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
 
-        # Find contours
-        cnts, _ = cv2.findContours(closed.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
+        # -------------------------
+        # REPLACEMENT: fixed-percentage crop (no contours)
+        # -------------------------
+        # Percentages you asked for:
+        x_min_proc = int(0.01 * w)
+        x_max_proc = int(0.99 * w)
+        y_min_proc = int(0.75 * h)
+        y_max_proc = h
 
-        candidate = None
-        candidate_box = None
+        # Make sure the proc coords are valid
+        x_min_proc = max(0, min(x_min_proc, w - 1))
+        x_max_proc = max(0, min(x_max_proc, w))
+        y_min_proc = max(0, min(y_min_proc, h - 1))
+        y_max_proc = max(0, min(y_max_proc, h))
 
-        # Primary candidate search
-        for c in cnts:
-            x, y, cw, ch = cv2.boundingRect(c)
-            rel_w = cw / float(w)
-            rel_h = ch / float(h)
-            rel_y = y / float(h)
-            aspect_ratio = cw / float(ch) if ch > 0 else 0
-            
-            if rel_w > 0.45 and rel_h < 0.30 and rel_y > 0.30 and aspect_ratio > 3.0:
-                candidate = c
-                candidate_box = (x, y, cw, ch)
-                break
-
-        # Fallback search in bottom region
-        if candidate is None:
-            roi_y = int(h * 0.55)
-            bottom_region = closed[roi_y:h, :]
-            cnts2, _ = cv2.findContours(bottom_region.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            cnts2 = sorted(cnts2, key=cv2.contourArea, reverse=True)
-            
-            for c in cnts2:
-                x, y, cw, ch = cv2.boundingRect(c)
-                y_full = y + roi_y
-                rel_w = cw / float(w)
-                rel_h = ch / float(h)
-                aspect_ratio = cw / float(ch) if ch > 0 else 0
-                
-                if rel_w > 0.45 and rel_h < 0.30 and aspect_ratio > 3.0:
-                    candidate = c
-                    candidate_box = (x, y_full, cw, ch)
-                    break
-
-        if candidate is None:
-            if debug:
-                return None, {
-                    "processed": proc, "gray": gray, "blackhat": blackhat,
-                    "gradX": gradX, "thresh": thresh, "closed": closed,
-                    "contours_searched": len(cnts)
-                }
-            return None
-
-        # Merge related contours
-        x_c, y_c, w_c, h_c = cv2.boundingRect(candidate)
-        cand_x1, cand_x2 = x_c, x_c + w_c
-        merge_list = [candidate]
-
-        # Find companion contours
-        for c in cnts:
-            if np.array_equal(c, candidate):
-                continue
-                
-            x, y, cw, ch = cv2.boundingRect(c)
-            x1, x2 = x, x + cw
-            
-            # Calculate overlap
-            inter_left = max(cand_x1, x1)
-            inter_right = min(cand_x2, x2)
-            inter_w = max(0, inter_right - inter_left)
-            overlap_ratio = inter_w / float(min(w_c, cw)) if min(w_c, cw) > 0 else 0
-
-            vert_gap = y - (y_c + h_c) if y > (y_c + h_c) else (y_c - (y + ch))
-            
-            if overlap_ratio > 0.5 and abs(vert_gap) < self.vertical_merge_gap_factor * h_c:
-                merge_list.append(c)
-
-        # Looser search for second line if needed
-        if len(merge_list) == 1:
-            for c in cnts:
-                if np.array_equal(c, candidate):
-                    continue
-                    
-                x, y, cw, ch = cv2.boundingRect(c)
-                cx = x + cw / 2.0
-                
-                if ((cand_x1 - 5) <= cx <= (cand_x2 + 5) and 
-                    (y > y_c) and 
-                    (y - (y_c + h_c) < self.vertical_merge_gap_factor * h_c)):
-                    merge_list.append(c)
-                    break
-
-        # Create merged contour and apply perspective correction
-        merged_contour = self._merge_contours_points(merge_list)
-        rect = cv2.minAreaRect(merged_contour)
-        box = cv2.boxPoints(rect).astype(int)
-
-        # Scale back to original coordinates
+        # Convert crop coords back to original image coordinates if we resized earlier
         if scale != 1.0:
             scale_inv = 1.0 / scale
-            box_orig = np.array(box, dtype="float32") * scale_inv
+            x_min = int(round(x_min_proc * scale_inv))
+            x_max = int(round(x_max_proc * scale_inv))
+            y_min = int(round(y_min_proc * scale_inv))
+            y_max = int(round(y_max_proc * scale_inv))
         else:
-            box_orig = np.array(box, dtype="float32")
+            x_min, x_max, y_min, y_max = x_min_proc, x_max_proc, y_min_proc, y_max_proc
 
-        # Expand bounding box
-        xs, ys = box_orig[:, 0], box_orig[:, 1]
+        # Clamp to original bounds
+        x_min = max(0, min(x_min, orig_w - 1))
+        x_max = max(0, min(x_max, orig_w))
+        y_min = max(0, min(y_min, orig_h - 1))
+        y_max = max(0, min(y_max, orig_h))
+
+        # Build box points in original coordinates (so warp works)
+        box_orig = np.array([
+            [x_min, y_min],
+            [x_max - 1, y_min],
+            [x_max - 1, y_max - 1],
+            [x_min, y_max - 1]
+        ], dtype="float32")
+
+        # Expand bounding box by expand_pixels (safely)
+        """xs, ys = box_orig[:, 0], box_orig[:, 1]
         x_min = max(int(xs.min()) - self.expand_pixels, 0)
         y_min = max(int(ys.min()) - self.expand_pixels, 0)
         x_max = min(int(xs.max()) + self.expand_pixels, orig_w - 1)
-        y_max = min(int(ys.max()) + self.expand_pixels, orig_h - 1)
+        y_max = min(int(ys.max()) + self.expand_pixels, orig_h - 1)"""
 
-        # Apply perspective transformation
+        # Attempt perspective warp with the rectangular box
         try:
-            warped = self._four_point_warp(orig, box_orig)
+            # Use the four corners in original coordinates for warping
+            """box_for_warp = np.array([
+                [x_min, y_min],
+                [x_max, y_min],
+                [x_max, y_max],
+                [x_min, y_max]
+            ], dtype="float32")"""
+            """warped = self._four_point_warp(gray, box_for_warp)"""
+            warped = proc[y_min_proc:y_max_proc, x_min_proc:x_max_proc]
+
         except Exception as e:
             logger.warning(f"Perspective warp failed, using rect crop: {e}")
-            warped = orig[y_min:y_max, x_min:x_max]
+            #warped = gray[y_min_proc:y_max_proc, x_min_proc:x_max_proc]
 
-        # Handle narrow crops
-        if warped is not None and warped.shape[0] < int(1.3 * h_c * (1.0/scale)):
-            extra = int(h_c * (1.5 / max(scale, 1e-6)))
+        # Handle narrow crops similarly to previous logic:
+        # compute a pseudo h_c based on proc crop height (scaled to original)
+        """h_c_proc = (y_max_proc - y_min_proc)
+        if h_c_proc <= 0:
+            h_c_proc = 1
+        if warped is not None and warped.shape[0] < int(1.3 * (h_c_proc * (1.0 / max(scale, 1e-6)))):
+            extra = int(h_c_proc * (1.5 / max(scale, 1e-6)))
             y_min2 = max(y_min - extra, 0)
             y_max2 = min(y_max + extra, orig_h - 1)
-            warped = orig[y_min2:y_max2, x_min:x_max]
+            warped = gray[y_min2:y_max2, x_min:x_max]"""
 
         # OCR validation if requested
         ocr_result = None
         if use_ocr and TESSERACT_AVAILABLE and warped is not None:
             ocr_result = self._perform_ocr_validation(warped)
 
-        # Prepare metadata
+        # Prepare metadata (keep merged_contours_count but set to 1 because no merging)
         metadata = {
             'mrz_detected': warped is not None,
-            'merged_contours_count': len(merge_list),
+            'merged_contours_count': 1,
             'ocr_result': ocr_result,
             'image_dimensions': {'height': orig_h, 'width': orig_w}
         }
@@ -403,13 +366,14 @@ class MRZExtractor:
             debug_info = {
                 "processed": proc, "gray": gray, "blackhat": blackhat,
                 "gradX": gradX, "thresh": thresh, "closed": closed,
-                "selected_candidate_box": candidate_box,
-                "merged_contours_count": len(merge_list),
+                "selected_candidate_box": (x_min_proc, y_min_proc, x_max_proc - x_min_proc, y_max_proc - y_min_proc),
+                "merged_contours_count": 1,
                 "expanded_bbox": (x_min, y_min, x_max - x_min, y_max - y_min),
             }
             metadata['debug_info'] = debug_info
 
         return warped, metadata
+
 
     def _perform_ocr_validation(self, image: np.ndarray) -> Dict[str, Any]:
         """Perform OCR on MRZ region and validate format."""
