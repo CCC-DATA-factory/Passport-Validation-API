@@ -19,6 +19,11 @@ import logging
 import re
 import base64
 import inspect
+import pytesseract
+from passporteye import read_mrz
+import os
+from PIL import Image as PILImage
+import io
 
 
 try:
@@ -266,7 +271,7 @@ class PassportValidationOrchestrator:
                 validation_result['errors'].append('MRZ region not detected')
                 return validation_result
             
-            # Step 4: MRZ Data Parsing (you'll implement this)
+            # Step 4: MRZ Data Parsing 
             logger.info("Parsing MRZ data...")
             mrz_data = await self._parse_mrz_data_1(mrz_image)
             
@@ -604,52 +609,75 @@ class PassportValidationOrchestrator:
                 return s
 
             def normalize_yymmdd(s: str) -> str:
-                """Return YYMMDD or empty string. Try to salvage common formats."""
+                s = (s or "").strip()
                 if not s:
                     return ""
-                s = s.strip()
-                digits = re.sub(r'[^0-9]', '', s)
+                digits = "".join(ch for ch in s if ch.isdigit())
                 if len(digits) == 6:
-                    # Validate the date before returning
-                    try:
-                        year = int(digits[0:2])
-                        month = int(digits[2:4])
-                        day = int(digits[4:6])
-                        
-                        # Basic validation
-                        if month < 1 or month > 12:
-                            return "000101"  # Default safe date
-                        if day < 1 or day > 31:
-                            return "000101"  # Default safe date
-                        
-                        return digits
-                    except (ValueError, IndexError):
-                        return "000101"
-                        
+                    yy, mm, dd = int(digits[0:2]), int(digits[2:4]), int(digits[4:6])
+                    year = 1900 + yy if yy >= 50 else 2000 + yy
+                    try: return f"{year:04d}-{mm:02d}-{dd:02d}"
+                    except: return s
                 if len(digits) == 8:
-                    return digits[2:]  # YYYYMMDD -> YYMMDD
-                
-                corrected = correct_digits_heuristic(s)
-                if len(corrected) >= 6:
-                    # Validate corrected date too
+                    try: return f"{int(digits[0:4]):04d}-{int(digits[4:6]):02d}-{int(digits[6:8]):02d}"
+                    except: return s
+                return s
+
+            def prepare_img_for_passporteye(mrz_image):
+                """
+                Accepts: np.ndarray (OpenCV BGR), PIL.Image, or bytes/bytearray (jpeg/png).
+                Returns: BytesIO object (ready for passporteye.read_mrz), or None on failure.
+                """
+
+                if mrz_image is None:
+                    return None
+
+                # 1) numpy array (OpenCV BGR/Gray/RGB)
+                if isinstance(mrz_image, np.ndarray):
+                    arr = mrz_image
+                    if arr.dtype != np.uint8:
+                        if arr.max() <= 1.0:  # normalized
+                            arr = (arr * 255).astype(np.uint8)
+                        else:
+                            arr = arr.astype(np.uint8)
+
+                    if arr.ndim == 2:  # grayscale → RGB
+                        arr = cv2.cvtColor(arr, cv2.COLOR_GRAY2RGB)
+                    elif arr.ndim == 3 and arr.shape[2] == 3:  # BGR → RGB
+                        arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
+                    elif arr.ndim == 3 and arr.shape[2] == 4:  # BGRA → RGB
+                        arr = cv2.cvtColor(arr, cv2.COLOR_BGRA2RGB)
+                    else:
+                        return None
+
+                    pil_img = PILImage.fromarray(arr)
+
+                # 2) PIL Image
+                elif isinstance(mrz_image, PILImage.Image):
+                    pil_img = mrz_image.convert("RGB")
+
+                # 3) raw bytes
+                elif isinstance(mrz_image, (bytes, bytearray)):
                     try:
-                        year = int(corrected[0:2])
-                        month = int(corrected[2:4])
-                        day = int(corrected[4:6])
-                        
-                        if month < 1 or month > 12 or day < 1 or day > 31:
-                            return "000101"
-                        
-                        return corrected[:6]
-                    except (ValueError, IndexError):
-                        return "000101"
-                
-                return "000101"  # Default safe date if nothing works
+                        pil_img = PILImage.open(io.BytesIO(mrz_image)).convert("RGB")
+                    except Exception:
+                        return None
+
+                else:
+                    return None
+
+                # Convert final PIL image to BytesIO (JPEG)
+                img_bytes = io.BytesIO()
+                pil_img.save(img_bytes, format="JPEG")
+                img_bytes.seek(0)
+                return img_bytes
+        # --- Start of main function logic -----------------------------------------
 
             # Convert input to PIL image first
             pil_img = to_pil(mrz_image)
-            if pil_img is None:
-                logger.error("Failed to convert input to PIL image")
+            img_for_pe = prepare_img_for_passporteye(mrz_image)
+            if img_for_pe is None:
+                logger.error("Failed to prepare image for PassportEye")
                 return None
 
             # Initialize variables
@@ -667,55 +695,83 @@ class PassportValidationOrchestrator:
 
             if passporteye_available:
                 try:
-                    passporteye_obj = read_mrz(pil_img)
-                    logger.debug("PassportEye processing completed")
+                    # Pass img_for_pe (either a path string or numpy array) to read_mrz
+                    passporteye_obj = read_mrz(img_for_pe)
+                    logger.debug("PassportEye processing completed; returned: %s", type(passporteye_obj))
                 except Exception as e:
-                    logger.warning("PassportEye read_mrz raised: %s", e)
+                    logger.warning("PassportEye read_mrz raised: %s", e, exc_info=False)
                     passporteye_obj = None
 
-            # If PassportEye succeeded, try to extract lines/fields
+            # If PassportEye succeeded, try to extract lines/fields (support both MRZ instance or wrapper)
             if passporteye_obj is not None:
                 try:
-                    # Get the raw MRZ lines first
-                    mrz_data = passporteye_obj.mrz
-                    if hasattr(mrz_data, 'aux') and hasattr(mrz_data.aux, 'image'):
-                        # Get raw text lines
-                        try:
-                            raw_lines = []
-                            if hasattr(passporteye_obj, 'mrz') and hasattr(passporteye_obj.mrz, 'raw_text'):
-                                raw_text = passporteye_obj.mrz.raw_text
-                                raw_lines = [line.strip() for line in raw_text.split('\n') if line.strip()]
-                            
-                            if len(raw_lines) >= 2:
-                                raw_line1, raw_line2 = raw_lines[0], raw_lines[1]
-                            
-                        except Exception as e:
-                            logger.debug("Failed to get raw lines from PassportEye: %s", e)
+                    # support both: returned object is MRZ directly, or object has .mrz attribute
+                    mrz_obj = getattr(passporteye_obj, "mrz", passporteye_obj)
+                    logger.debug("Using mrz_obj type: %s", type(mrz_obj))
 
-                    # Extract parsed fields if available
+                    # try to get raw_text from multiple sources
+                    raw_text = getattr(mrz_obj, "raw_text", None)
+                    if not raw_text and hasattr(mrz_obj, "to_string"):
+                        try:
+                            raw_text = mrz_obj.to_string()
+                        except Exception:
+                            pass
+                    if not raw_text and hasattr(mrz_obj, "to_dict"):
+                        try:
+                            raw_text = mrz_obj.to_dict().get("raw_text") or raw_text
+                        except Exception:
+                            pass
+
+                    if raw_text:
+                        raw_lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+                        if len(raw_lines) >= 2:
+                            raw_line1, raw_line2 = raw_lines[0], raw_lines[1]
+
+                    # prefer using to_dict() if available (cleaner)
                     try:
-                        if hasattr(passporteye_obj, 'mrz') and passporteye_obj.mrz is not None:
-                            mrz = passporteye_obj.mrz
-                            
+                        if hasattr(mrz_obj, "to_dict"):
+                            d = mrz_obj.to_dict()
                             parsed_data = {
-                                'document_type': getattr(mrz, 'document_type', '') or 'P',
-                                'country_code': getattr(mrz, 'country', '') or '',
-                                'surname': (getattr(mrz, 'surname', '') or '').replace('<', ' ').strip(),
-                                'given_names': (getattr(mrz, 'names', '') or '').replace('<', ' ').strip(),
-                                'passport_number': (getattr(mrz, 'number', '') or '').replace('<', ''),
-                                'nationality': getattr(mrz, 'nationality', '') or '',
-                                'date_of_birth': normalize_yymmdd(getattr(mrz, 'date_of_birth', '') or ''),
-                                'gender': (getattr(mrz, 'sex', '') or '').upper(),
-                                'expiration_date': normalize_yymmdd(getattr(mrz, 'expiration_date', '') or ''),
-                                'personal_number': (getattr(mrz, 'personal_number', '') or '').replace('<', ''),
+                                "document_type": d.get("type") or d.get("mrz_type") or "P",
+                                "country_code": d.get("country") or "",
+                                "surname": (d.get("surname") or "").replace("<", " ").strip(),
+                                "given_names": (d.get("names") or "").replace("<", " ").strip(),
+                                "passport_number": (d.get("number") or "").replace("<", ""),
+                                "nationality": d.get("nationality") or "",
+                                "date_of_birth": normalize_yymmdd(d.get("date_of_birth") or ""),
+                                "gender": (d.get("sex") or "").upper(),
+                                "expiration_date": normalize_yymmdd(d.get("expiration_date") or ""),
+                                "personal_number": (d.get("personal_number") or "").replace("<", ""),
                             }
-                            
-                    except Exception as e:
-                        logger.debug("Error extracting fields from PassportEye result: %s", e)
+
+                            # --- Add confidence checks ---
+                            if  d.get("valid_score") < 100:
+                                raise ValueError("Low confidence for passport_number")
+                            if not d.get("valid_number"):
+                                raise ValueError("Low confidence for passport_number")
+                            if not d.get("valid_date_of_birth"):
+                                raise ValueError("Low confidence for date_of_birth")
+                            if not d.get("valid_expiration_date"):
+                                raise ValueError("Low confidence for expiration_date")
+                        # If all required fields are present and valid, we can return
+                        else:
+                            parsed_data = {
+                                "document_type": getattr(mrz_obj, "document_type", "").replace("<", " ").strip() or "P",
+                                "country_code": getattr(mrz_obj, "country", "") or "",
+                                "surname": (getattr(mrz_obj, "surname", "") or "").replace("<", " ").strip(),
+                                "given_names": (getattr(mrz_obj, "names", "") or "").replace("<", " ").strip(),
+                                "passport_number": (getattr(mrz_obj, "number", "") or "").replace("<", ""),
+                                "nationality": getattr(mrz_obj, "nationality", "") or "",
+                                "date_of_birth": normalize_yymmdd(getattr(mrz_obj, "date_of_birth", "") or ""),
+                                "gender": (getattr(mrz_obj, "sex", "") or "").upper(),
+                                "expiration_date": normalize_yymmdd(getattr(mrz_obj, "expiration_date", "") or ""),
+                                "personal_number": (getattr(mrz_obj, "personal_number", "") or "").replace("<", ""),
+                            }
+                    except Exception:
+                        logger.exception("Error extracting fields from MRZ object")
 
                 except Exception as e:
                     logger.debug("Error processing PassportEye result: %s", e)
-
             # --- Fallback: If PassportEye failed to produce usable MRZ, run Tesseract OCR ---
             if not raw_line1 or not raw_line2:
                 logger.debug("PassportEye did not yield usable MRZ lines — falling back to Tesseract OCR")
@@ -853,7 +909,7 @@ class PassportValidationOrchestrator:
             parsed_data['nationality'] = parsed_data.get('nationality') or 'XXX'
             
             # Ensure dates are valid
-            dob = parsed_data.get('date_of_birth') or '000101'
+            """dob = parsed_data.get('date_of_birth') or '000101'
             if not dob or len(dob) != 6 or not dob.isdigit():
                 dob = '000101'
             else:
@@ -881,7 +937,7 @@ class PassportValidationOrchestrator:
                         exp_date = '991231'
                 except (ValueError, IndexError):
                     exp_date = '991231'
-            parsed_data['expiration_date'] = exp_date
+            parsed_data['expiration_date'] = exp_date"""
             
             # Ensure gender is valid
             gender = (parsed_data.get('gender') or 'X').upper()
@@ -893,7 +949,7 @@ class PassportValidationOrchestrator:
 
             # --- Handle check digits with proper corrections ---
             # Apply digit corrections to check digit fields
-            check_fields = ['passport_check', 'dob_check', 'exp_check', 'personal_check', 'overall_check']
+            check_fields = ['passport_check','personal_check', 'overall_check']
             for field in check_fields:
                 if field not in parsed_data or not parsed_data[field]:
                     parsed_data[field] = '0'  # Default check digit
@@ -909,6 +965,14 @@ class PassportValidationOrchestrator:
                 logger.debug("Exception during check-digit validation: %s", e)
                 checks_ok = False
 
+            
+            doc_type = parsed_data.get('document_type', 'P')
+            doc_type = doc_type.replace("<", "").strip()  # remove MRZ filler
+            if len(doc_type) > 1:
+                doc_type = doc_type[0]  # only take first character
+            parsed_data['document_type'] = doc_type or 'P'
+
+            
             # Build MRZDataV2 with validated data
             try:
                 mrz_obj = MRZDataV2(
