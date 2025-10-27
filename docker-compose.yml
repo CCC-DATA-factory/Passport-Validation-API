@@ -10,16 +10,16 @@ services:
     env_file:
       - .env
     environment:
-      - APP_MODULE=${APP_MODULE}
+      - APP_MODULE=${APP_MODULE:-main:app}
       - HOST=0.0.0.0
       - PORT=8000
-      - WORKERS=${WORKERS:-2}
+      - WORKERS=${WORKERS:-1}
       - TESSERACT_CMD=${TESSERACT_CMD}
     volumes:
-      - ./uploads:/app/uploads   
-      - ./tests:/app/tests:ro    
+      - ./uploads:/app/uploads
+      - ./tests:/app/tests:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/healthz || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
