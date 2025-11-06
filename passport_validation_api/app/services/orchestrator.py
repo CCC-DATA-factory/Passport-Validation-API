@@ -972,7 +972,9 @@ class PassportValidationOrchestrator:
                 doc_type = doc_type[0]  # only take first character
             parsed_data['document_type'] = doc_type or 'P'
 
-            
+            if parsed_data.get('country_code') == "TUN":
+                personal_number = parsed_data.get('personal_number', '')
+                parsed_data['personal_number'] = personal_number[:8]  
             # Build MRZDataV2 with validated data
             try:
                 mrz_obj = MRZDataV2(
