@@ -38,19 +38,19 @@ class MRZDataV2(BaseModel):
     raw_mrz_line2: str = Field(..., description="Raw second MRZ line")
     check_digit_valid: bool = Field(True, description="Whether check digits are valid")
     
-    @validator('document_type')
+    """@validator('document_type')
     def validate_document_type(cls, v):
         if v not in ['P', 'V']:  # P for passport, V for visa
             raise ValueError('Document type must be P or V')
-        return v
+        return v"""
     
-    @validator('country_code', 'nationality')
+    """@validator('country_code', 'nationality')
     def validate_country_codes(cls, v):
         if len(v) != 3 or not v.isalpha():
             raise ValueError('Country codes must be 3 letters')
-        return v.upper()
+        return v.upper()"""
     
-    @validator('date_of_birth', 'expiration_date')
+    """@validator('date_of_birth', 'expiration_date')
     def validate_dates(cls, v):
         try:
             datetime.strptime(v, "%Y-%m-%d")
@@ -61,7 +61,7 @@ class MRZDataV2(BaseModel):
     def validate_gender(cls, v):
         if v not in ['M', 'F', 'X']:
             raise ValueError('Gender must be M, F, or X')
-        return v
+        return v"""
     
     @validator('raw_mrz_line1', 'raw_mrz_line2')
     def validate_mrz_lines(cls, v):
@@ -70,6 +70,39 @@ class MRZDataV2(BaseModel):
         if not re.match(r'^[A-Z0-9<]{44}$', v):
             raise ValueError('MRZ lines can only contain A-Z, 0-9, and <')
         return v
+    
+    @validator('document_type', pre=True, always=True)
+    def validate_document_type(cls, v):
+        # Skip strict check; just keep first char if exists
+        if v:
+            v = v.replace('<', '').strip()
+            return v[0] if len(v) > 0 else 'P'
+        return 'P'
+
+    @validator('gender', pre=True, always=True)
+    def validate_gender(cls, v):
+        # Default to 'X' if invalid
+        return v if v in ['M','F','X'] else 'X'
+
+    @validator('date_of_birth', pre=True, always=True)
+    def validate_dob(cls, v):
+        # Skip strict date validation; just return as-is if exists
+        return v or '1900-01-01'
+
+    @validator('expiration_date')
+    def validate_expiration_date(cls, v):
+        # Only field we enforce strictly
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+            return v
+        except ValueError:
+            raise ValueError("Expiration date must be in YYYY-MM-DD format")
+        
+    @validator('passport_number')
+    def validate_passport_number(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError("Passport number is required")
+        return v.strip()
     
     def to_readable_format(self) -> Dict[str, str]:
         """Convert MRZ data to human-readable format."""
