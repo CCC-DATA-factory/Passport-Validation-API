@@ -899,7 +899,7 @@ class PassportValidationOrchestrator:
             except Exception as e:
                 logger.debug("Error extracting fields from MRZ fixed positions: %s", e)
 
-            # --- Validation and defaults for required fields ---
+            """# --- Validation and defaults for required fields ---
             # Set defaults for required fields if they're empty
             parsed_data['document_type'] = parsed_data.get('document_type') or 'P'
             parsed_data['country_code'] = parsed_data.get('country_code') or 'XXX'
@@ -909,7 +909,7 @@ class PassportValidationOrchestrator:
             parsed_data['nationality'] = parsed_data.get('nationality') or 'XXX'
             
             # Ensure dates are valid
-            """dob = parsed_data.get('date_of_birth') or '000101'
+            dob = parsed_data.get('date_of_birth') or '000101'
             if not dob or len(dob) != 6 or not dob.isdigit():
                 dob = '000101'
             else:
@@ -937,7 +937,7 @@ class PassportValidationOrchestrator:
                         exp_date = '991231'
                 except (ValueError, IndexError):
                     exp_date = '991231'
-            parsed_data['expiration_date'] = exp_date"""
+            parsed_data['expiration_date'] = exp_date
             
             # Ensure gender is valid
             gender = (parsed_data.get('gender') or 'X').upper()
@@ -974,7 +974,40 @@ class PassportValidationOrchestrator:
 
             if parsed_data.get('country_code') == "TUN":
                 personal_number = parsed_data.get('personal_number', '')
-                parsed_data['personal_number'] = personal_number[:8]  
+                parsed_data['personal_number'] = personal_number[:8]"""
+            
+            # --- Validation and defaults for only passport_number and expiration_date ---
+            parsed_data['passport_number'] = parsed_data.get('passport_number', '').replace('<', '')
+            if not parsed_data['passport_number']:
+                logger.warning("Invalid or missing passport_number")
+                return None  # Fail only if passport_number is missing
+
+            parsed_data['expiration_date'] = normalize_yymmdd(parsed_data.get('expiration_date', ''))
+            if not parsed_data['expiration_date']:
+                logger.warning("Invalid or missing expiration_date")
+                return None  # Fail only if expiration_date is missing
+
+            # For all other fields, set safe defaults if missing
+            parsed_data['document_type'] = parsed_data.get('document_type', 'P')
+            parsed_data['country_code'] = parsed_data.get('country_code', 'XXX')
+            parsed_data['surname'] = parsed_data.get('surname', 'UNKNOWN')
+            parsed_data['given_names'] = parsed_data.get('given_names', 'UNKNOWN')
+            parsed_data['nationality'] = parsed_data.get('nationality', 'XXX')
+            parsed_data['date_of_birth'] = parsed_data.get('date_of_birth', '1900-01-01')
+            parsed_data['gender'] = parsed_data.get('gender', 'X')
+            parsed_data['personal_number'] = parsed_data.get('personal_number', '')
+
+            # Apply digit corrections only for passport_number and expiration_date checks if you want
+            check_fields = ['passport_check', 'exp_check']
+            for field in check_fields:
+                parsed_data[field] = parsed_data.get(field, '0')
+
+            try:
+                checks_ok = self._validate_check_digits(line1, line2, parsed_data)
+            except Exception as e:
+                logger.debug("Exception during check-digit validation: %s", e)
+                checks_ok = False
+
             # Build MRZDataV2 with validated data
             try:
                 mrz_obj = MRZDataV2(
